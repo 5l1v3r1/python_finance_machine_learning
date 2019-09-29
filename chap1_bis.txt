@@ -1,0 +1,86 @@
+source: https://www.zacks.com/stock/quote/AMD
+JPM report: http://valuesimplex.com/articles/JPM.pdf
+
+install talib
+wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+tar -xzvf ta-lib-0.4.0-src.tar.gz
+./configure --prefix=/usr
+make
+make install
+ldconfig
+
+install statsmodels
+pip install statsmodels==0.8.0rc1
+
+
+print(amd_df.head()) 
+EDA plots 
+
+amd_df['Adj_Close'].plot() 
+plt.show() 
+
+plt.clf() 
+
+vol = amd_df['Adj_Volume'] 
+vol.plot.hist(bins=50) 
+plt.show() 
+
+Prices changes
+amd_df['10d_close_pct'] = amd_df['Adj_Close'].pct_change(10) 
+amd_df['10d_close_pct'].plot.hist(bins=50) 
+plt.show() 
+
+shift data
+amd_df['10d_future_close'] = amd_df['Adj_Close'].shift(-10) 
+amd_df['10d_future_close_pct'] = amd_df['10d_future_close'].pct_change(10)
+  
+corr = amd_df.corr() 
+print(corr) 
+
+Making features and targets 
+features = amd_df[['10d_close_pct', 'Adj_Volume']]
+targets = amd_df['10d_future_close_pct'] 
+print(type(features)) 
+print(type(targets)) 
+
+Calculating SMA , RSI
+ 
+import talib 
+amd_df['ma200'] = talib.SMA(amd_df['Adj_Close'].values, timeperiod=200) 
+amd_df['rsi200'] = talib.RSI(amd_df['Adj_Close'].values, timeperiod=200) 
+
+feature_names = ['10d_close_pct', 'ma200', 'rsi200'] 
+features = amd_df[feature_names] 
+targets = amd_df['10d_future_close_pct'] 
+
+feature_target_df = amd_df[feature_names + '10d_future_close_pct'] 
+
+Check correlations 
+import seaborn as sns
+corr = feature_target_df.corr() 
+sns.heatmap(corr, annot=True) 
+
+Make train and test sets 
+
+import statsmodels.api as sm 
+linear_features = sm.add_constant(features) 
+train_size = int(0.05 * targets.shape[0]) 
+
+
+train_features = linear_features[:train_size] 
+train_targets = targets[:train_size] 
+test_features = linear_features[train_size:] 
+test_targets = targets[train_size:] 
+
+
+Linear modeling 
+
+model = sm.OLS(train_targets, train_features) 
+results = model.fit() 
+print(results.summary()) 
+
+print(results.pvalues) 
+
+
+
+ 

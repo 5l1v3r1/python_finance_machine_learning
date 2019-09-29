@@ -1,0 +1,31 @@
+chap3 4eme videos
+
+Overfitting and ensembling 
+
+Neural network options
+
+Decrease number of nodes
+Use L1/L2 regulariation 
+Dropout 
+Autoencoder archictecture
+Early stopping 
+Adding noise to data
+Max norm constants
+Ensembling
+
+from keras.layers import Dense, Dropout 
+
+model = Sequential()
+model.add(Dense(500,
+                input_data=scaled_train_features.shape[1]
+                activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(100, activation='relu'))
+model.add(Dense(1, activation='linear'))
+
+Implementing ensembling 
+test_pred1 = model_1.predict(scaled_test_features) 
+test_pred2 = model_2.predict(scaled_test_features) 
+
+test_preds = np.mean(np.hstack((test_pred1, test_pred2)), axis=1) 
+print(test_preds[-1:])

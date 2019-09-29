@@ -1,0 +1,480 @@
+Engineering features 
+
+One problem with linear models 
+
+
+
+Volume features
+amd_df['Adj_Volume_1d_change'] = amd_df['Adj_Volume'].pct_change()
+one_day_change = amd_df['Adj_Volume_1d_change'].values
+amd_df['Adj_Volume_1d_change_SMA'] = talib.SMA(one_day_change,
+                                                timeperiod=10) 
+
+Extracting the day of week
+print(amd_df.index.dayofweek)
+Int64Index([2, 3, 4, 0, 1, 2, 3, 4, 0, 1,
+            ...
+            1, 2, 3, 4, 0, 1, 2, 3, 4, 0],
+           dtype='int64', name='Date', length=4807) 
+
+
+Dummies
+days_of_week = pd.get_dummies(amd_df.index.dayofweek,
+                                prefix='weekday',
+                                drop_first=True)
+print(days_of_week.head())
+            weekday_1  weekday_2  weekday_3  weekday_4
+Date
+2018-04-10          1          0          0          0
+2018-04-11          0          1          0          0
+2018-04-12          0          0          1          0
+2018-04-13          0          0          0          1
+2018-04-16          0          0          0          0 
+
+Feature engineering from volume
+We're going to use non-linear models to make more accurate predictions. With linear models, features must be linearly correlated to the target. Other machine learning models can combine features in non-linear ways. For example, what if the price goes up when the moving average of price is going up, and the moving average of volume is going down? The only way to capture those interactions is to either multiply the features, or to use a machine learning algorithm that can handle non-linearity (e.g. random forests).
+
+To incorporate more information that may interact with other features, we can add in weakly-correlated features. First we will add volume data, which we have in the lng_df as the Adj_Volume column. 
+
+# Create 2 new volume features, 1-day % change and 5-day SMA of the % change
+new_features = ['Adj_Volume_1d_change', 'Adj_Volume_1d_change_SMA']
+feature_names.extend(new_features)
+lng_df['Adj_Volume_1d_change'] = lng_df['Adj_Volume'].pct_change()
+lng_df['Adj_Volume_1d_change_SMA'] = talib.SMA(lng_df['Adj_Volume_1d_change'].values,
+                                               timeperiod=5)
+
+# Plot histogram of volume % change data
+lng_df[new_features].plot(kind='hist', sharex=False, bins=50)
+plt.show() 
+
+Create day-of-week features
+We can engineer datetime features to add even more information for our non-linear models. Most financial data has datetimes, which have lots of information in them -- year, month, day, and sometimes hour, minute, and second. But we can also get the day of the week, and things like the quarter of the year, or the elapsed time since some event (e.g. earnings reports).
+
+We are only going to get the day of the week here, since our dataset doesn't go back very far in time. The dayofweek property from the pandas datetime index will help us get the day of the week. Then we will dummy dayofweek with pandas' get_dummies(). This creates columns for each day of the week with binary values (0 or 1). We drop the first column because it can be inferred from the others. 
+
+# Use pandas' get_dummies function to get dummies for day of the week
+days_of_week = pd.get_dummies(lng_df.index.dayofweek,
+                              prefix='weekday',
+                              drop_first=True)
+
+# Set the index as the original DataFrame index for merging
+days_of_week.index = lng_df.index
+
+# Join the dataframe with the days of week DataFrame
+lng_df = pd.concat([lng_df, days_of_week], axis=1)
+
+# Add days of week to feature names
+feature_names.extend(['weekday_' + str(i) for i in range(1, 5)])
+lng_df.dropna(inplace=True)  # drop missing values in-place
+print(lng_df.head()) 
+
+# Use pandas' get_dummies function to get dummies for day of the week
+days_of_week = pd.get_dummies(lng_df.index.dayofweek,
+                              prefix='weekday',
+                              drop_first=True)
+
+# Set the index as the original DataFrame index for merging
+days_of_week.index = lng_df.index
+
+# Join the dataframe with the days of week DataFrame
+lng_df = pd.concat([lng_df, days_of_week], axis=1)
+
+# Add days of week to feature names
+feature_names.extend(['weekday_' + str(i) for i in range(1, 5)])
+lng_df.dropna(inplace=True)  # drop missing values in-place
+print(lng_df.head()) 
+
+Adj_Close  Adj_Volume  5d_future_close  5d_close_future_pct  \
+Date                                                                      
+2017-01-31      47.65   2137394.0            47.81             0.003358   
+2017-02-01      47.10   2051631.0            48.01             0.019321   
+2017-02-02      49.33   3081369.0            49.19            -0.002838   
+2017-02-03      49.43   4158130.0            48.93            -0.010115   
+2017-02-06      48.50   2090909.0            48.14            -0.007423   
+
+            5d_close_pct      ma14      rsi14      ma30      rsi30      ma50  \
+Date                                                                           
+2017-01-31      0.043812  0.950697  62.968946  0.918657  60.655749  0.895731   
+2017-02-01     -0.023429  0.967486  60.156019  0.932427  59.159791  0.910110   
+2017-02-02     -0.021618  0.932220  66.659314  0.895486  62.988478  0.873379   
+2017-02-03      0.007336  0.938976  66.920059  0.899461  63.148741  0.875497   
+2017-02-06      0.022129  0.964080  62.059184  0.921608  60.623276  0.895860   
+
+                rsi50     ma200     rsi200  Adj_Volume_1d_change  \
+Date                                                               
+2017-01-31  57.951677  0.839267  53.695377             -0.175332   
+2017-02-01  57.041713  0.850150  53.487663             -0.040125   
+2017-02-02  59.662227  0.812956  54.209475              0.501912   
+2017-02-03  59.774509  0.812490  54.241479              0.349442   
+2017-02-06  58.236185  0.829234  53.889442             -0.497152   
+
+            Adj_Volume_1d_change_SMA  weekday_1  weekday_2  weekday_3  \
+Date                                                                    
+2017-01-31                 -0.000664          1          0          0   
+2017-02-01                 -0.165783          0          1          0   
+2017-02-02                 -0.081419          0          0          1   
+2017-02-03                  0.108332          0          0          0   
+2017-02-06                  0.027749          0          0          0   
+
+            weekday_4  
+Date                   
+2017-01-31          0  
+2017-02-01          0  
+2017-02-02          0  
+2017-02-03          1  
+2017-02-06          0
+
+In [2]: 
+
+
+Examine correlations of the new features
+Now that we have our volume and datetime features, we want to check the correlations between our new features (stored in the new_features list) and the target (5d_close_future_pct) to see how strongly they are related. Recall pandas has the built-in .corr() method for DataFrames, and seaborn has a nice heatmap() function to show the correlations. 
+
+# Add the weekday labels to the new_features list
+new_features.extend(['weekday_' + str(i) for i in range(1, 5)])
+
+# Plot the correlations between the new features and the targets
+sns.heatmap(lng_df[new_features + ['5d_close_future_pct']].corr(), annot=True)
+plt.yticks(rotation=0)  # ensure y-axis ticklabels are horizontal
+plt.xticks(rotation=90)  # ensure x-axis ticklabels are vertical
+plt.tight_layout()
+plt.show() 
+
+
+Decision Trees >> root nodes leaf nodes 
+
+day is friday [1 1 1] day is not friday [0 0 0] 
+
+day price <= 0.1 [0 0 0] day price >=0.0 [1 1 1] 
+
+Regression trees
+from sklearn.tree import DecisionTreeRegressor
+
+decision_tree = DecisionTreeRegressor(max_depth=5)
+
+decision_tree.fit(train_features, train_targets) 
+
+Decision tree hyperparameters
+
+Evaluate model
+print(decision_tree.score(train_features, train_targets))
+print(decision_tree.score(test_features, test_targets))
+ 0.6662215501032416
+-0.08917300191734268
+
+train_predictions = decision_tree.predict(train_features)
+test_predictions = decision_tree.predict(test_features)
+plt.scatter(train_predictions, train_targets, label='train')
+plt.scatter(test_predictions, test_targets, label='test')
+plt.legend()
+plt.show()
+
+
+Fit a decision tree
+Random forests are a go-to model for predictions; they work well out of the box. But we'll first learn the building block of random forests -- decision trees.
+
+Decision trees split the data into groups based on the features. Decision trees start with a root node, and split the data down until we reach leaf nodes.
+
+decision tree
+
+We can use sklearn to fit a decision tree with DecisionTreeRegressor and .fit(features, targets).
+
+Without limiting the tree's depth (or height), it will keep splitting the data until each leaf has 1 sample in it, which is the epitome of overfitting. We'll learn more about overfitting in the coming chapters. 
+
+from sklearn.tree import DecisionTreeRegressor
+
+# Create a decision tree regression model with default arguments
+decision_tree = DecisionTreeRegressor()
+
+# Fit the model to the training features and targets
+decision_tree.fit(train_features, train_targets)
+
+# Check the score on train and test
+print(decision_tree.score(train_features, train_targets))
+print(decision_tree.score(test_features, test_targets)) 
+
+0.9999958787531624
+-1.9012021333289968
+
+
+Try different max depths
+We always want to optimize our machine learning models to make the best predictions possible. We can do this by tuning hyperparameters, which are settings for our models. We will see in more detail how these are useful in future chapters, but for now think of them as knobs we can turn to tune our predictions to be as good as possible.
+
+For regular decision trees, probably the most important hyperparameter is max_depth. This limits the number of splits in a decision tree. Let's find the best value of max_depth based on the R2 score of our model on the test set, which we can obtain using the score() method of our decision tree models. 
+
+
+# Loop through a few different max depths and check the performance
+for d in [3, 5, 10]:
+    # Create the tree and fit it
+    decision_tree = DecisionTreeRegressor(max_depth=d)
+    decision_tree.fit(train_features, train_targets)
+
+    # Print out the scores on train and test
+    print('max_depth=', str(d))
+    print(decision_tree.score(train_features, train_targets))
+    print(decision_tree.score(test_features, test_targets), '\n') 
+
+max_depth= 3
+0.313332035717818
+-0.3070692210378403 
+
+max_depth= 5
+0.5117261722974893
+-0.8619890807162844 
+
+max_depth= 10
+0.8989880793409756
+-1.6535505160753914 
+
+Check our results
+Once we have an optimized model, we want to check how it is performing in more detail. We already saw the R2 score, but it can be helpful to see the predictions plotted vs actual values. We can use the .predict() method of our decision tree model to get predictions on the train and test sets.
+
+Ideally, we want to see diagonal lines from the lower left to the upper right. However, due to the simplicity of decisions trees, our model is not going to do well on the test set. But it will do well on the train set. 
+
+# Use the best max_depth of 3 from last exercise to fit a decision tree
+decision_tree = DecisionTreeRegressor(max_depth=3)
+decision_tree.fit(train_features, train_targets)
+
+# Predict values for train and test
+train_predictions = decision_tree.predict(train_features)
+test_predictions = decision_tree.predict(test_features)
+
+# Scatter the predictions vs actual values
+plt.scatter(train_predictions, train_targets, label='train')
+plt.scatter(test_predictions, test_targets, label='test')
+plt.show() 
+
+
+
+Random forests
+
+sklearn implementation
+from sklearn.ensemble import RandomForestRegressor
+
+random_forest = RandomForestRegressor()
+random_forest.fit(train_features, train_targets)
+print(random_forest.score(train_features, train_targets)) 
+
+Hyperparameters
+random_forest = RandomForestRegressor(n_estimators=200,
+                                      max_depth=5,
+                                      max_features=4,
+                                      random_state=42) 
+
+from sklearn.model_selection import ParameterGrid
+
+grid = {'n_estimators': [200], 'max_depth':[3, 5], 'max_features': [4, 8]} 
+
+from pprint import pprint
+
+pprint(list(ParameterGrid(grid)))
+
+[{'max_depth': 3, 'max_features': 4, 'n_estimators': 200},
+ {'max_depth': 3, 'max_features': 8, 'n_estimators': 200},
+ {'max_depth': 5, 'max_features': 4, 'n_estimators': 200},
+ {'max_depth': 5, 'max_features': 8, 'n_estimators': 200}] 
+
+ParamaterGrid
+test_scores = []
+
+# loop through the parameter grid, set hyperparameters, save the scores
+for g in ParameterGrid(grid):
+    rfr.set_params(**g)  # ** is "unpacking" the dictionary
+    rfr.fit(train_features, train_targets)
+    test_scores.append(rfr.score(test_features, test_targets)) 
+
+# find best hyperparameters from the test score and print
+best_idx = np.argmax(test_scores)
+print(test_scores[best_idx])
+print(ParameterGrid(grid)[best_idx]) 
+
+Fit a random forest
+Data scientists often use random forest models. They perform well out of the box, and have lots of settings to optimize performance. Random forests can be used for classification or regression; we'll use it for regression to predict the future price change of LNG.
+
+We'll create and fit the random forest model similarly to the decision trees using the .fit(features, targets) method. With sklearn's RandomForestRegressor, there's a built-in .score() method we can use to evaluate performance. This takes arguments (features, targets), and returns the R2 score (the coefficient of determination). 
+
+from sklearn.ensemble import RandomForestRegressor
+
+# Create the random forest model and fit to the training data
+rfr = RandomForestRegressor(n_estimators=200)
+rfr.fit(train_features, train_targets)
+
+# Look at the R^2 scores on train and test
+print(rfr.score(train_features, train_targets))
+print(rfr.score(test_features, test_targets)) 
+
+0.9028440321482755
+-0.11714851221212454 
+
+
+Tune random forest hyperparameters
+As with all models, we want to optimize performance by tuning hyperparameters. We have many hyperparameters for random forests, but the most important is often the number of features we sample at each split, or max_features in RandomForestRegressor from the sklearn library. For models like random forests that have randomness built-in, we also want to set the random_state. This is set for our results to be reproducible.
+
+Usually, we can use sklearn's GridSearchCV() method to search hyperparameters, but with a financial time series, we don't want to do cross-validation due to data mixing. We want to fit our models on the oldest data and evaluate on the newest data. So we'll use sklearn's ParameterGrid to create combinations of hyperparameters to search. 
+
+from sklearn.model_selection import ParameterGrid
+
+# Create a dictionary of hyperparameters to search
+grid = {'n_estimators': [200], 'max_depth': [3], 'max_features': [4, 8], 'random_state': [42]}
+test_scores = []
+
+# Loop through the parameter grid, set the hyperparameters, and save the scores
+for g in ParameterGrid(grid):
+    rfr.set_params(**g)  # ** is "unpacking" the dictionary
+    rfr.fit(train_features, train_targets)
+    test_scores.append(rfr.score(test_features, test_targets))
+
+# Find best hyperparameters from the test score and print
+best_idx = np.argmax(test_scores)
+print(test_scores[best_idx], ParameterGrid(grid)[best_idx]) 
+
+0.048188439095540936 {'n_estimators': 200, 'max_depth': 3, 'random_state': 42, 'max_features': 4} 
+
+Evaluate performance
+Lastly, and as always, we want to evaluate performance of our best model to check how well or poorly we are doing. Ideally it's best to do back-testing, but that's an involved process we don't have room to cover in this course.
+
+We've already seen the R2 scores, but let's take a look at the scatter plot of predictions vs actual results using matplotlib. Perfect predictions would be a diagonal line from the lower left to the upper right.
+
+# Use the best hyperparameters from before to fit a random forest model
+rfr = RandomForestRegressor(n_estimators=200, max_depth=3, max_features=4, random_state=42)
+rfr.fit(train_features, train_targets)
+
+# Make predictions with our model
+train_predictions = rfr.predict(train_features)
+test_predictions = rfr.predict(test_features)
+
+# Create a scatter plot with train and test actual vs predictions
+plt.scatter(train_targets, train_predictions, label='train')
+plt.scatter(test_targets, test_predictions, label='test')
+plt.legend()
+plt.show() 
+
+Feature importances and gradient boosting
+
+from sklearn.ensemble import RandomForestRegressor
+
+random_forest = RandomForestRegressor()
+random_forest.fit(train_features, train_targets)
+
+feature_importances = random_forest.feature_importances_
+
+print(feature_importances) 
+
+Sorting and plotting
+# feature importances from random forest model
+importances = random_forest.feature_importances_
+
+# index of greatest to least feature importances
+sorted_index = np.argsort(importances)[::-1]
+ x = range(len(importances))
+# create tick labels
+labels = np.array(feature_names)[sorted_index]
+
+plt.bar(x, importances[sorted_index], tick_label=labels)
+
+# rotate tick labels to vertical
+plt.xticks(rotation=90)
+plt.show() 
+
+Fitting a gradient boosting model
+from sklearn.ensemble import GradientBoostingRegressor
+
+gbr = GradientBoostingRegressor(max_features=4,
+                                learning_rate=0.01,
+                                n_estimators=200,
+                                subsample=0.6,
+                                random_state=42)
+
+gbr.fit(train_features, train_targets) 
+
+
+Random forest feature importances
+One useful aspect of tree-based methods is the ability to extract feature importances. This is a quantitative way to measure how much each feature contributes to our predictions. It can help us focus on our best features, possibly enhancing or tuning them, and can also help us get rid of useless features that may be cluttering up our model.
+
+Tree models in sklearn have a .feature_importances_ property that's accessible after fitting the model. This stores the feature importance scores. We need to get the indices of the sorted feature importances using np.argsort() in order to make a nice-looking bar plot of feature importances (sorted from greatest to least importance). 
+
+# Get feature importances from our random forest model
+importances = rfr.feature_importances_
+
+# Get the index of importances from greatest importance to least
+sorted_index = np.argsort(importances)[::-1]
+x = range(len(importances))
+
+# Create tick labels 
+labels = np.array(feature_names)[sorted_index]
+plt.bar(x, importances[sorted_index], tick_label=labels)
+
+# Rotate tick labels to vertical
+plt.xticks(rotation=90)
+plt.show() 
+
+
+A gradient boosting model
+Now we'll fit a gradient boosting (GB) model. It's been said a linear model is like a Toyota Camry, and GB is like a Black Hawk helicopter. GB has potential to outperform random forests, but doesn't always do so. This is called the no free lunch theorem, meaning we should always try lots of different models for each problem.
+
+GB is similar to random forest models, but the difference is that trees are built successively. With each iteration, the next tree fits the residual errors from the previous tree in order to improve the fit.
+
+For now we won't search our hyperparameters -- they've been searched for you. 
+
+from sklearn.ensemble import GradientBoostingRegressor
+
+# Create GB model -- hyperparameters have already been searched for you
+gbr = GradientBoostingRegressor(max_features=4,
+                                learning_rate=0.01,
+                                n_estimators=200,
+                                subsample=0.6,
+                                random_state=42)
+gbr.fit(train_features, train_targets)
+
+print(gbr.score(train_features, train_targets))
+print(gbr.score(test_features, test_targets)) 
+
+0.4063115061547039
+0.03992305163583343 
+
+Gradient boosting feature importances
+As with random forests, we can extract feature importances from gradient boosting models to understand which features are the best predictors. Sometimes it's nice to try different tree-based models and look at the feature importances from all of them. This can help average out any peculiarities that may arise from one particular model.
+
+The feature importances are stored as a numpy array in the .feature_importances_ property of the gradient boosting model. We'll need to get the sorted indices of the feature importances, using np.argsort(), in order to make a nice plot. We want the features from largest to smallest, so we will use Python's indexing to reverse the sorted importances like feat_importances[::-1]. 
+
+# Extract feature importances from the fitted gradient boosting model
+feature_importances = gbr.feature_importances_
+
+# Get the indices of the largest to smallest feature importances
+sorted_index = np.argsort(feature_importances)[::-1]
+x = range(features.shape[1])
+
+# Create tick labels 
+labels = np.array(feature_names)[sorted_index]
+
+plt.bar(x, feature_importances[sorted_index], tick_label=labels)
+
+# Set the tick lables to be the feature names, according to the sorted feature_idx
+plt.xticks(rotation=90)
+plt.show() 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

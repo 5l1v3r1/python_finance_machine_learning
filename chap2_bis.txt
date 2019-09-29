@@ -1,0 +1,119 @@
+Engineering more features 
+
+amd_df['Adj_Volume_1d_change'] = amd_df['Adj_Volume'].pct_change() 
+
+one_day_change = amd_df['Adj_Volume_1d_change'].values 
+amd_df['Adj_Volume_1d_change_SMA'] = talibe.SMA(one_day_change, timeperiod=10) 
+
+
+Datetime feature engineering 
+ 
+2018-04-12 
+
+day of week  day of month  month  quarter
+
+print(amd_df.index.dayofweek) 
+
+Dummies
+
+days_of_week = pd.get_dummies(amd_df.index.dayofweek, prefix='weekday', drop_first=True) 
+print(days_of_week.head()) 
+
+
+Decision trees
+
+     root node [0, 0, 1, 1, 0, 1, 0]   -------> leaf node [0, 0, 0, 0] 
+
+
+                                       --------> leaf node [1, 1, 1] 
+
+pip install sklearn 
+
+Regression trees
+from sklearn.tree import DecisionTreeRegressor 
+
+decision_tree = DecisionTreeRegressor(max_depth=5) 
+decision_tree.fit(train_features, train_targets) 
+
+
+Evaluate model 
+print(decision_tree.score(train_features, train_targets)) 
+print(decision_tree.score(test_features, test_targets)) 
+
+train_predictions = decision_tree.predict(train_features) 
+test_predictions = decision_tree.predict(test_features) 
+plt.scatter(train_predictions, train_targets, label='train') 
+plt.scatter(test_predictions, test_targets, label='test') 
+iplt.legend() 
+plt.show() 
+
+
+Feature sampling
+ 
+Random forests 
+. A collection (ensemble) of decision trees
+. Bootstrap aggregating (bagging) 
+. Sample of features at each split 
+
+from sklearn.ensemble import RandomForestRegressor 
+
+random_forest = RandomForestRegressor() 
+random_forest.fit(train_features, train_targets) 
+print(random_forest.score(train_features, train_targets)) 
+
+Hyperparameters
+random_forest = RandomForestRegressor(n_estimators=200, 
+                                      max_depth=5, 
+                                      max_features=4, 
+                                      random_state=42) 
+ParametersGrid
+from sklearn.model_selection import ParameterGrid 
+
+grid = {'n_estimators': [200], 'max_depth': [3, 5], 'max_features': [4, 8]} 
+
+from pprint import pprint 
+pprint(list(ParameterGrid(grid))) 
+
+test_scores = [] 
+
+for g in ParameterGrid(grid): 
+ rfr.set_params(**g) 
+ rfr.fit(train_features, train_targets) 
+ test_scores.append(rfr.score(test_features, test_targets)) 
+
+best_idx = np.argmax(test_scores) 
+print(test_cores[best_idx]) 
+print(ParametersGrid(grid)[best_idx]) 
+
+
+Feature importances and gradient boosting
+from sklearn.ensemble import RandomForestRegressor
+
+random_forest = RandomForestRegressor() 
+random_forest.fit(train_features, train_targets) 
+
+feature_importances = random_forest.feature_importances_
+print(feature_importances) 
+
+importances = random_forest.feature_importances_ 
+sorted_index = np.argsort(importances)[:: -1] 
+
+x = range(len(importances)) 
+labels = np.array(feature_names)[sorted_index] 
+
+plt.bar(x, importances[sorted_index], tick_label=labels) 
+plt.xticks(rotation=90) 
+plt.show() 
+ 
+Fitting a gradient boosting model 
+from sklearn.ensemble import GradientBoostingRegressor 
+
+gbr = GradientBoostingRegressor(max_features=4, 
+                                learning_rate=0.01, 
+                                n_estimators=200, 
+                                subsample=0.6, 
+                                random_stats=42) 
+
+gbr.fit(train_features, train_targets) 
+
+

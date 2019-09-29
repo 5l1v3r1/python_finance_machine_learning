@@ -1,0 +1,396 @@
+Machine Learning in Finance 
+
+source: https://www.zacks.com/stock/quote/AMD
+JPM report: http://valuesimplex.com/articles/JPM.pdf 
+
+Understanding the data
+print(amd_df.head()) 
+Adj_Close  Adj_Volume
+Date                             
+1999-03-10      8.690   4871800.0
+1999-03-11      8.500   3566600.0
+1999-03-12      8.250   4126800.0
+1999-03-15      8.155   3006400.0
+1999-03-16      8.500   3511400.0 
+
+amd_df['Adj_Close'].plot()
+plt.show() 
+
+plt.clf()  # clears the plot area
+vol = amd_df['Adj_Volume']
+vol.plot.hist(bins=50)
+plt.show() 
+
+Price changes
+amd_df['10d_close_pct'] = amd_df['Adj_Close'].pct_change(10)
+amd_df['10d_close_pct'].plot.hist(bins=50)
+plt.show() 
+
+Shift data
+amd_df['10d_future_close'] = amd_df['Adj_Close'].shift(-10)
+amd_df['10d_future_close_pct'] = amd_df['10d_future_close'].pct_change(10) 
+
+Correlations
+corr = amd_df.corr()
+print(corr)
+                      10d_future_close_pct  10d_future_close  10d_close_pct  \
+10d_future_close_pct              1.000000          0.070742       0.030402   
+10d_future_close                  0.070742          1.000000       0.082828   
+10d_close_pct                     0.030402          0.082828       1.000000   
+Adj_Close                        -0.083982          0.979345       0.073843   
+Adj_Volume                       -0.024456         -0.122473       0.044537   
+
+                      Adj_Close  Adj_Volume  
+10d_future_close_pct  -0.083982   -0.024456  
+10d_future_close       0.979345   -0.122473  
+10d_close_pct          0.073843    0.044537  
+Adj_Close              1.000000   -0.119437  
+Adj_Volume            -0.119437    1.000000 
+
+Explore the data with some EDA
+First, let's explore the data. Any time we begin a machine learning (ML) project, we need to first do some exploratory data analysis (EDA) to familiarize ourselves with the data. This includes things like:
+
+raw data plots
+histograms
+and more...
+I typically begin with raw data plots and histograms. This allows us to understand our data's distributions. If it's a normal distribution, we can use things like parametric statistics.
+
+There are two stocks loaded for you into pandas DataFrames: lng_df and spy_df (LNG and SPY). Take a look at them with .head(). We'll use the closing prices and eventually volume as inputs to ML algorithms.
+
+Note: We'll call plt.clf() each time we want to make a new plot, or f = plt.figure(). 
+
+print(lng_df.head())  # examine the dataframe
+print(spy_df.head())  # examine the SPY DataFrame
+
+# Plot the Adj_Close columns for SPY and LNG
+spy_df['Adj_Close'].plot(label='SPY', legend=True)
+lng_df['Adj_Close'].plot(label='LNG', legend=True, secondary_y=True)
+plt.show()  # show the plot
+plt.clf()  # clear the plot space for the next plot
+
+# Histogram of the daily price change percent of Adj_Close for LNG
+lng_df['Adj_Close'].pct_change().plot.hist(bins=50)
+plt.xlabel('adjusted close 1-day percent change')
+plt.show() 
+
+ Adj_Close  Adj_Volume
+Date                             
+2016-04-15      37.13   4293775.0
+2016-04-18      36.90   3445852.0
+2016-04-19      37.12   3748050.0
+2016-04-20      37.77   2470384.0
+2016-04-21      37.21   2043988.0
+             Adj_Close  Adj_Volume
+Date                              
+2016-04-15  198.866552  75761600.0
+2016-04-18  200.263926  75277700.0
+2016-04-19  200.895603  88316100.0
+2016-04-20  201.087035  81100300.0
+2016-04-21  200.005505  85695000.0
+
+
+Correlations
+Correlations are nice to check out before building machine learning models, because we can see which features correlate to the target most strongly. Pearson's correlation coefficient is often used, which only detects linear relationships. It's commonly assumed our data is normally distributed, which we can "eyeball" from histograms. Highly correlated variables have a Pearson correlation coefficient near 1 (positively correlated) or -1 (negatively correlated). A value near 0 means the two variables are not linearly correlated.
+
+If we use the same time periods for previous price changes and future price changes, we can see if the stock price is mean-reverting (bounces around) or trend-following (goes up if it has been going up recently).
+
+# Create 5-day % changes of Adj_Close for the current day, and 5 days in the future
+lng_df['5d_future_close'] = lng_df['Adj_Close'].shift(-5)
+lng_df['5d_close_future_pct'] = lng_df['5d_future_close'].pct_change(5)
+lng_df['5d_close_pct'] = lng_df['Adj_Close'].pct_change(5)
+
+# Calculate the correlation matrix between the 5d close pecentage changes (current and future)
+corr = lng_df[['5d_close_pct', '5d_close_future_pct']].corr()
+print(corr)
+
+# Scatter the current 5-day percent change vs the future 5-day percent change
+plt.scatter(lng_df['5d_close_pct'], lng_df['5d_close_future_pct'])
+plt.show()
+
+5d_close_pct  5d_close_future_pct
+5d_close_pct             1.000000            -0.165383
+5d_close_future_pct     -0.165383             1.000000 
+
+Data transforms, features, and targets
+
+Making features and targets
+
+features = amd_df[['10d_close_pct', 'Adj_Volume']]
+targets = amd_df['10d_future_close_pct'] 
+
+print(type(features))
+pandas.core.series.DataFrame
+print(type(targets)) 
+print(type(features))
+pandas.core.series.DataFrame
+print(type(targets))  
+
+
+
+Calculating SMA and RSI
+import talib
+amd_df['ma200'] = talib.SMA(amd_df['Adj_Close'].values, timeperiod=200)
+amd_df['rsi200'] = talib.RSI(amd_df['Adj_Close'].values, timeperiod=200) 
+
+Finally, our features
+feature_names = ['10d_close_pct', 'ma200', 'rsi200']
+features = amd_df[feature_names]
+targets = amd_df['10d_future_close_pct']
+
+feature_target_df = amd_df[feature_names + '10d_future_close_pct'] 
+
+Check correlations
+import seaborn as sns
+
+corr = feature_target_df.corr()
+sns.heatmap(corr, annot=True) 
+
+
+Create moving average and RSI features
+We want to add historical data to our machine learning models to make better predictions, but adding lots of historical time steps is tricky. Instead, we can condense information from previous points into a single timestep with indicators.
+
+A moving average is one of the simplest indicators - it's the average of previous data points. This is the function talib.SMA() from the TAlib library.
+
+Another common technical indicator is the relative strength index (RSI). This is defined by:
+
+RSI=100−1001+RS
+RS=average gain over n periodsaverage loss over n periods
+The n periods is set in talib.RSI() as the timeperiod argument.
+
+
+
+A common period for RSI is 14, so we'll use that as one setting in our calculations.
+feature_names = ['5d_close_pct']  # a list of the feature names for later
+
+# Create moving averages and rsi for timeperiods of 14, 30, 50, and 200
+for n in [14, 30, 50, 200]:
+
+    # Create the moving average indicator and divide by Adj_Close
+    lng_df['ma' + str(n)] = talib.SMA(lng_df['Adj_Close'].values,
+                              timeperiod=n) / lng_df['Adj_Close']
+    # Create the RSI indicator
+    lng_df['rsi' + str(n)] = talib.RSI(lng_df['Adj_Close'].values, timeperiod=n)
+    
+    # Add rsi and moving average to the feature name list
+    feature_names = feature_names + ['ma' + str(n), 'rsi' + str(n)]
+    
+print(feature_names) 
+
+
+Create features and targets
+We almost have features and targets that are machine-learning ready -- we have features from current price changes (5d_close_pct) and indicators (moving averages and RSI), and we created targets of future price changes (5d_close_future_pct). Now we need to break these up into separate numpy arrays so we can feed them into machine learning algorithms.
+
+Our indicators also cause us to have missing values at the beginning of the DataFrame due to the calculations. We could backfill this data, fill it with a single value, or drop the rows. Dropping the rows is a good choice, so our machine learning algorithms aren't confused by any sort of backfilled or 0-filled data. Pandas has a .dropna() function which we will use to drop any rows with missing values. 
+
+# Drop all na values
+lng_df = lng_df.dropna()
+
+# Create features and targets
+# use feature_names for features; 5d_close_future_pct for targets
+features = lng_df[feature_names]
+targets = lng_df['5d_close_future_pct']
+
+# Create DataFrame from target column and feature columns
+feat_targ_df = lng_df[['5d_close_future_pct'] + feature_names]
+
+# Calculate correlation matrix
+corr = feat_targ_df.corr()
+print(corr) 
+
+5d_close_future_pct  5d_close_pct      ma14     rsi14  \
+5d_close_future_pct             1.000000     -0.047183  0.096373 -0.068888   
+5d_close_pct                   -0.047183      1.000000 -0.827699  0.683973   
+ma14                            0.096373     -0.827699  1.000000 -0.877566   
+rsi14                          -0.068888      0.683973 -0.877566  1.000000   
+ma30                            0.102744     -0.609573  0.848778 -0.964795   
+rsi30                          -0.106279      0.518748 -0.713427  0.935711   
+ma50                            0.113444     -0.475081  0.692689 -0.916540   
+rsi50                          -0.138946      0.426045 -0.601849  0.845788   
+ma200                           0.230860     -0.220690  0.346457 -0.551087   
+rsi200                         -0.221029      0.284021 -0.416221  0.639057   
+
+                         ma30     rsi30      ma50     rsi50     ma200  \
+5d_close_future_pct  0.102744 -0.106279  0.113444 -0.138946  0.230860   
+5d_close_pct        -0.609573  0.518748 -0.475081  0.426045 -0.220690   
+ma14                 0.848778 -0.713427  0.692689 -0.601849  0.346457   
+rsi14               -0.964795  0.935711 -0.916540  0.845788 -0.551087   
+ma30                 1.000000 -0.900934  0.925715 -0.805506  0.527767   
+rsi30               -0.900934  1.000000 -0.962825  0.975608 -0.761846   
+ma50                 0.925715 -0.962825  1.000000 -0.915729  0.693863   
+rsi50               -0.805506  0.975608 -0.915729  1.000000 -0.871883   
+ma200                0.527767 -0.761846  0.693863 -0.871883  1.000000   
+rsi200              -0.600068  0.834532 -0.750857  0.930507 -0.976110   
+
+                       rsi200  
+5d_close_future_pct -0.221029  
+5d_close_pct         0.284021  
+ma14                -0.416221  
+rsi14                0.639057  
+ma30                -0.600068  
+rsi30                0.834532  
+ma50                -0.750857  
+rsi50                0.930507  
+ma200               -0.976110  
+rsi200               1.000000
+
+Check the correlations
+Before we fit our first machine learning model, let's look at the correlations between features and targets. Ideally we want large (near 1 or -1) correlations between features and targets. Examining correlations can help us tweak features to maximize correlation (for example, altering the timeperiod argument in the talib functions). It can also help us remove features that aren't correlated to the target.
+
+To easily plot a correlation matrix, we can use seaborn's heatmap() function. This takes a correlation matrix as the first argument, and has many other options. Check out the annot option -- this will help us turn on annotations. 
+
+# Plot heatmap of correlation matrix
+sns.heatmap(corr, annot=True)
+plt.yticks(rotation=0); plt.xticks(rotation=90)  # fix ticklabel directions
+plt.tight_layout()  # fits plot area to the plot, "tightly"
+plt.show()  # show the plot
+plt.clf()  # clear the plot area
+
+# Create a scatter plot of the most highly correlated variable with the target
+plt.scatter(lng_df['ma200'], lng_df['5d_close_future_pct'])
+plt.show() 
+
+
+Linear modeling
+Make train and test sets
+import statsmodels.api as sm
+linear_features = sm.add_constant(features) 
+
+train_size = int(0.85 * targets.shape[0])
+train_features = linear_features[:train_size]
+train_targets = targets[:train_size]
+test_features = linear_features[train_size:]
+test_targets = targets[train_size:] 
+
+some_list[start:stop:step] 
+
+
+Linear modeling
+model = sm.OLS(train_targets, train_features)
+results = model.fit() 
+
+p-values
+print(results.pvalues)
+ const            4.630428e-05
+10d_close_pct    3.546748e-01
+ma14             1.136941e-01
+rsi14            2.968699e-01
+ma200            9.126405e-14
+rsi200           1.169324e-10 
+
+
+Create train and test features
+Before we fit our linear model, we want to add a constant to our features, so we have an intercept for our linear model.
+
+We also want to create train and test features. This is so we can fit our model to the train dataset, and evaluate performance on the test dataset. We always want to check performance on data the model has not seen to make sure we're not overfitting, which is memorizing patterns in the training data too exactly.
+
+With a time series like this, we typically want to use the oldest data as our training set, and the newest data as our test set. This is so we can evaluate the performance of the model on the most recent data, which will more realistically simulate predictions on data we haven't seen yet. 
+
+# Import the statsmodels library with the alias sm
+import statsmodels.api as sm
+
+# Add a constant to the features
+linear_features = sm.add_constant(features)
+
+# Create a size for the training set that is 85% of the total number of samples
+train_size = int(0.85 * features.shape[0])
+train_features = linear_features[:train_size]
+train_targets = targets[:train_size]
+test_features = linear_features[train_size:]
+test_targets = targets[train_size:]
+print(linear_features.shape, train_features.shape, test_features.shape) 
+
+
+Fit a linear model
+We'll now fit a linear model, because they are simple and easy to understand. Once we've fit our model, we can see which predictor variables appear to be meaningfully linearly correlated with the target, as well as their magnitude of effect on the target. Our judgment of whether or not predictors are significant is based on the p-values of coefficients. This is using a t-test to statistically test if the coefficient significantly differs from 0. The p-value is the percent chance that the coefficient for a feature does not differ from zero. Typically, we take a p-value of less than 0.05 to mean the coefficient is significantly different from 0. 
+
+# Create the linear model and complete the least squares fit
+model = sm.OLS(train_targets, train_features)
+results = model.fit()  # fit the model
+print(results.summary())
+
+# examine pvalues
+# Features with p <= 0.05 are typically considered significantly different from 0
+print(results.pvalues)
+
+# Make predictions from our model for train and test sets
+train_predictions = results.predict(train_features)
+test_predictions = results.predict(test_features) 
+
+
+===============================================================================
+Dep. Variable:     5d_close_future_pct   R-squared:                       0.273
+Model:                             OLS   Adj. R-squared:                  0.246
+Method:                  Least Squares   F-statistic:                     10.01
+Date:                 Fri, 18 Jan 2019   Prob (F-statistic):           4.92e-13
+Time:                         00:11:50   Log-Likelihood:                 536.49
+No. Observations:                  250   AIC:                            -1053.
+Df Residuals:                      240   BIC:                            -1018.
+Df Model:                            9                                         
+Covariance Type:             nonrobust                                         
+================================================================================
+                   coef    std err          t      P>|t|      [0.025      0.975]
+--------------------------------------------------------------------------------
+const            6.8197      1.169      5.832      0.000       4.516       9.123
+5d_close_pct    -0.0944      0.114     -0.830      0.408      -0.319       0.130
+ma14             0.3473      0.230      1.512      0.132      -0.105       0.800
+rsi14            0.0261      0.004      6.520      0.000       0.018       0.034
+ma30             0.2200      0.206      1.067      0.287      -0.186       0.626
+rsi30           -0.1789      0.025     -7.111      0.000      -0.228      -0.129
+ma50            -2.0856      0.374     -5.578      0.000      -2.822      -1.349
+rsi50            0.2410      0.032      7.458      0.000       0.177       0.305
+ma200            0.5639      0.220      2.567      0.011       0.131       0.997
+rsi200          -0.1999      0.029     -6.999      0.000      -0.256      -0.144
+==============================================================================
+Omnibus:                        3.594   Durbin-Watson:                   0.560
+Prob(Omnibus):                  0.166   Jarque-Bera (JB):                2.482
+Skew:                          -0.038   Prob(JB):                        0.289
+Kurtosis:                       2.518   Cond. No.                     6.92e+04
+==============================================================================
+
+Warnings:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 6.92e+04. This might indicate that there are
+strong multicollinearity or other numerical problems.
+const           1.764767e-08
+5d_close_pct    4.075985e-01
+ma14            1.317652e-01
+rsi14           4.119023e-10
+ma30            2.870964e-01
+rsi30           1.315491e-11
+ma50            6.542888e-08
+rsi50           1.598367e-12
+ma200           1.087610e-02
+rsi200          2.559536e-11
+dtype: float64
+
+
+Evaluate our results
+Once we have our linear fit and predictions, we want to see how good the predictions are so we can decide if our model is any good or not. Ideally, we want to back-test any type of trading strategy. However, this is a complex and typically time-consuming experience.
+
+A quicker way to understand the performance of our model is looking at regression evaluation metrics like R2, and plotting the predictions versus the actual values of the targets. Perfect predictions would form a straight, diagonal line in such a plot, making it easy for us to eyeball how our predictions are doing in different regions of price changes. We can use matplotlib's .scatter() function to create scatter plots of the predictions and actual values. 
+
+# Scatter the predictions vs the targets with 80% transparency
+plt.scatter(train_predictions, train_targets, alpha=0.2, color='b', label='train')
+plt.scatter(test_predictions, test_targets, alpha=0.2, color='r', label='test')
+
+# Plot the perfect prediction line
+xmin, xmax = plt.xlim()
+plt.plot(np.arange(xmin, xmax, 0.01), np.arange(xmin, xmax, 0.01), c='k')
+
+# Set the axis labels and show the plot
+plt.xlabel('predictions')
+plt.ylabel('actual')
+plt.legend()  # show the legend
+plt.show() 
+
+
+
+
+
+
+
+
+
+
+
+
